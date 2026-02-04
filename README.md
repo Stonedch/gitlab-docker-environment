@@ -11,11 +11,12 @@
 - [Резервное копирование](#резервное-копирование)
 - [Настройка](#настройка)
 - [Импорт репозиториев из GitHub в GitLab](#импорт-репозиториев-из-github-в-gitlab)
+- [Экономия памяти (low-memory режим)](#экономия-памяти-low-memory-режим)
 
 ## Требования
 
 - Docker и Docker Compose
-- 4 ГБ RAM (рекомендуется 8 ГБ), 4+ ядра CPU, от 10 ГБ диска
+- 4 ГБ RAM (рекомендуется 8 ГБ; для небольших инстансов можно снизить в low-memory режиме), 2+ ядра CPU, от 10 ГБ диска
 - Домен, указывающий на сервер
 
 ## Быстрый старт
@@ -127,6 +128,29 @@ GITLAB_TOKEN=<YOUR_GITLAB_TOKEN> ./scripts/import-from-github.sh <GITHUB_USER> <
 ```
 
 Права токена GitLab: `api`, `write_repository`, `read_repository`.
+
+## Экономия памяти (low-memory режим)
+
+По умолчанию в `docker-compose.yml` включён более экономичный профиль:
+
+- отключены встроенные Prometheus/Grafana/Alertmanager и экспортеры
+- отключены Pages и Mattermost
+- Container Registry по умолчанию выключен (можно включить через `.env`)
+- уменьшены настройки Puma/Sidekiq
+- выставлены лимиты контейнера (можно переопределить в `.env`)
+
+Настраивается через `.env` (см. `.env.example`):
+
+| Переменная | По умолчанию | Зачем |
+|---|---:|---|
+| `GITLAB_MEM_LIMIT` | `2048m` | лимит памяти контейнера |
+| `GITLAB_CPUS` | `2` | лимит CPU контейнера |
+| `GITLAB_SHM_SIZE` | `64m` | shared memory контейнера |
+| `GITLAB_ENABLE_REGISTRY` | `false` | включить/выключить Registry |
+| `GITLAB_PUMA_WORKERS` | `0` | меньше воркеров = меньше RAM |
+| `GITLAB_PUMA_MIN_THREADS` | `1` | минимальные потоки Puma |
+| `GITLAB_PUMA_MAX_THREADS` | `2` | максимальные потоки Puma |
+| `GITLAB_SIDEKIQ_CONCURRENCY` | `5` | параллелизм Sidekiq |
 
 ---
 
