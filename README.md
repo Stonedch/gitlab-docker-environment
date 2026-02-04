@@ -2,6 +2,15 @@
 
 Готовая конфигурация Docker Compose для развёртывания GitLab (CE/EE) с PostgreSQL, Redis и Container Registry.
 
+## Содержание
+
+- [Требования](#требования)
+- [Быстрый старт](#быстрый-старт)
+- [Сервисы](#сервисы)
+- [Администрирование](#администрирование)
+- [Резервное копирование](#резервное-копирование)
+- [Настройка](#настройка)
+
 ## Требования
 
 - Docker и Docker Compose
@@ -14,7 +23,7 @@
 git clone https://github.com/your-username/gitlab-docker-compose.git
 cd gitlab-docker-compose
 cp .env.example .env
-# Отредактируйте .env: EXTERNAL_URL, HTTP_PORT, HTTPS_PORT, SSH_PORT
+# В .env задайте EXTERNAL_URL (ваш домен), порты и GITLAB_HOME (каталог данных, например .)
 mkdir -p gitlab/config gitlab/data gitlab/logs
 docker-compose up -d --build
 ```
@@ -23,7 +32,7 @@ docker-compose up -d --build
 
 ## Сервисы
 
-- **GitLab:** HTTP (80), HTTPS (443). Админ по умолчанию: `root`, пароль — см. раздел «Администрирование».
+- **GitLab:** HTTP (80), HTTPS (443). Админ по умолчанию: `root`, пароль — см. раздел [«Администрирование»](#администрирование).
 - **SSH:** порт 22 для Git.
 - **PostgreSQL, Redis, Container Registry** — внутри контейнера, на том же домене.
 
@@ -62,7 +71,15 @@ docker-compose exec -t gitlab gitlab-backup restore BACKUP=ИД_БЭКАПА
 
 ## Настройка
 
-Переменные в `.env`: `EXTERNAL_URL`, `HTTP_PORT`, `HTTPS_PORT`, `SSH_PORT`, `GITLAB_HOME`.
+Переменные в `.env` (см. `.env.example`):
+
+| Переменная     | Описание                          |
+|----------------|-----------------------------------|
+| `EXTERNAL_URL` | URL GitLab (например `http://gitlab.example.com`) |
+| `HTTP_PORT`    | Порт HTTP на хосте (по умолчанию 80) |
+| `HTTPS_PORT`   | Порт HTTPS на хосте (443)         |
+| `SSH_PORT`     | Порт SSH для Git на хосте (22)    |
+| `GITLAB_HOME`  | Базовый каталог для config/data/logs (например `.`) |
 
 Если порт 22 занят системным SSH — смените порт в `.env` или перенастройте системный SSH. Для HTTPS настройте сертификаты в GitLab.
 
@@ -71,14 +88,8 @@ docker-compose exec -t gitlab gitlab-backup restore BACKUP=ИД_БЭКАПА
 docker-compose exec gitlab gitlab-ctl reconfigure
 ```
 
-## Типичные проблемы
-
-Логи: `docker-compose logs gitlab` или `docker-compose exec gitlab tail -f /var/log/gitlab/gitlab-rails/production.log`
-
-Права на каталоги: `sudo chown -R 1000:1000 ./gitlab/data ./gitlab/logs`
-
-Перезапуск: `docker-compose restart gitlab` или `docker-compose exec gitlab gitlab-ctl restart`
-
 ---
 
-Автор: @stonedch
+**Лицензия:** [MIT License](LICENSE)
+
+**Автор:** [@stonedch](https://github.com/stonedch/)
