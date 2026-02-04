@@ -7,18 +7,14 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# --- Logging ---
-# Определяем путь к директории логов относительно корня проекта (где находится .env)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 LOG_DIR="${PROJECT_ROOT}/.logs/import"
 RUN_TS="$(date +%Y-%m-%d_%H-%M-%S)"
 LOG_FILE="${LOG_DIR}/import_${RUN_TS}.log"
 
-# Создаём директорию для логов перед перенаправлением вывода
 mkdir -p "${LOG_DIR}"
 
-# Redirect all output to log + console
 exec > >(tee -a "${LOG_FILE}") 2>&1
 
 echo "============================================================"
@@ -27,7 +23,6 @@ echo "Log file: ${LOG_FILE}"
 echo "============================================================"
 echo ""
 
-# Функция для URL-encoding
 urlencode() {
     local string="${1}"
     local strlen=${#string}
@@ -59,7 +54,6 @@ fi
 
 source .env
 
-# Аргументы (если переданы) имеют приоритет над .env
 ARG_GITHUB_USER="$1"
 ARG_GITHUB_TOKEN="$2"
 ARG_GITLAB_TOKEN="$3"
@@ -69,10 +63,6 @@ GITHUB_TOKEN="${ARG_GITHUB_TOKEN:-${GITHUB_TOKEN}}"
 
 REPOS_DIR=".github/repositories"
 
-# GitLab token можно передать:
-# - 3-м аргументом
-# - через переменную окружения GITLAB_TOKEN
-# - через .env (GITLAB_TOKEN=...)
 if [ -n "$ARG_GITLAB_TOKEN" ]; then
     GITLAB_TOKEN="$ARG_GITLAB_TOKEN"
     USE_EXISTING_TOKEN=true
@@ -102,14 +92,11 @@ fi
 
 GITLAB_PORT="${HTTP_PORT:-80}"
 
-# Формирование базового URL
 GITLAB_URL="${EXTERNAL_URL}"
-GITLAB_URL="${GITLAB_URL%/}"  # Убираем trailing slash
+GITLAB_URL="${GITLAB_URL%/}"
 
-# Если EXTERNAL_URL не содержит порт и порт не стандартный, добавляем его
 if [[ ! "$EXTERNAL_URL" =~ :[0-9]+(/|$) ]]; then
     if [ "$GITLAB_PORT" != "80" ] && [ "$GITLAB_PORT" != "443" ]; then
-        # Определяем протокол
         if [[ "$EXTERNAL_URL" =~ ^https:// ]]; then
             GITLAB_URL="${EXTERNAL_URL}:${GITLAB_PORT}"
         else
@@ -138,7 +125,6 @@ fi
 echo -e "${GREEN}Пароль root получен${NC}"
 echo ""
 
-# Проверка доступности GitLab
 echo -e "${YELLOW}Проверка доступности GitLab...${NC}"
 if ! curl -s --connect-timeout 5 --max-time 10 "${GITLAB_API_URL}" > /dev/null 2>&1; then
     echo -e "${YELLOW}⚠ GitLab недоступен по адресу ${GITLAB_API_URL}${NC}"
@@ -147,7 +133,6 @@ if ! curl -s --connect-timeout 5 --max-time 10 "${GITLAB_API_URL}" > /dev/null 2
     echo ""
 fi
 
-# Создание или использование существующего токена
 if [ "$USE_EXISTING_TOKEN" = true ]; then
     echo -e "${GREEN}Используется переданный токен GitLab${NC}"
     echo ""
@@ -170,7 +155,6 @@ else
     TOKEN_BODY=$(echo "$TOKEN_RESPONSE" | sed '$d')
 
     if [ "$TOKEN_HTTP_CODE" = "201" ] || [ "$TOKEN_HTTP_CODE" = "200" ]; then
-        # Успешное создание токена
         if command -v jq > /dev/null 2>&1; then
             GITLAB_TOKEN=$(echo "$TOKEN_BODY" | jq -r '.token' 2>/dev/null || echo "")
         else
@@ -185,7 +169,6 @@ else
             exit 1
         fi
     else
-        # Ошибка создания токена
         echo -e "${RED}✗ Ошибка создания токена (HTTP $TOKEN_HTTP_CODE)${NC}"
         if command -v jq > /dev/null 2>&1; then
             ERROR_MSG=$(echo "$TOKEN_BODY" | jq -r '.message // .error // empty' 2>/dev/null || echo "")
@@ -287,7 +270,6 @@ echo "$REPO_LIST" | while read -r REPO_FULL_NAME; do
         continue
     fi
     
-    # Проверяем, существует ли проект в GitLab (и параллельно получаем URL репозитория)
     PROJECT_GET=$(curl -s -w "\n%{http_code}" --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
         "${GITLAB_API_URL}/api/v4/projects/root%2F${REPO_NAME}" 2>/dev/null)
     PROJECT_GET_CODE=$(echo "$PROJECT_GET" | tail -n1)
@@ -314,8 +296,6 @@ echo "$REPO_LIST" | while read -r REPO_FULL_NAME; do
         if [ "$PROJECT_CREATE_CODE" != "201" ] && [ "$PROJECT_CREATE_CODE" != "200" ]; then
             echo -e "  ${RED}✗ Ошибка создания репозитория (HTTP ${PROJECT_CREATE_CODE})${NC}"
             echo "$PROJECT_CREATE_BODY" | head -3 | sed 's/^/    /'
-            # Частый кейс: проект уже существует, но GET по root/path не вернул 200 (например, из-за прав/namespace).
-            # Попробуем найти проект через search и использовать его URL.
             if echo "$PROJECT_CREATE_BODY" | grep -q "has already been taken"; then
                 echo "  Похоже, проект уже существует. Пробую найти его через поиск..."
                 SEARCH=$(curl -s -w "\n%{http_code}" --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
@@ -325,16 +305,13 @@ echo "$REPO_LIST" | while read -r REPO_FULL_NAME; do
 
                 if [ "$SEARCH_CODE" = "200" ]; then
                     if command -v jq > /dev/null 2>&1; then
-                        # Берём первый проект с совпадающим path
                         GITLAB_REPO_URL=$(echo "$SEARCH_BODY" | jq -r --arg p "$REPO_NAME" '.[] | select(.path==$p) | .http_url_to_repo' 2>/dev/null | head -n1)
                     else
-                        # Fallback без jq: грубо берём первый http_url_to_repo из результатов
                         GITLAB_REPO_URL=$(echo "$SEARCH_BODY" | grep -o '"http_url_to_repo":"[^"]*' | head -n1 | cut -d'"' -f4)
                     fi
 
                     if [ -n "$GITLAB_REPO_URL" ] && [ "$GITLAB_REPO_URL" != "null" ]; then
                         echo -e "  ${GREEN}✓ Найден существующий проект${NC}"
-                        # Пропускаем continue — ниже будет push
                     else
                         echo -e "  ${RED}✗ Поиск не нашёл URL репозитория${NC}"
                         continue
@@ -363,7 +340,6 @@ echo "$REPO_LIST" | while read -r REPO_FULL_NAME; do
         continue
     fi
 
-    # Санити-чек URL репозитория (jq может вернуть 'null')
     if [ -z "$GITLAB_REPO_URL" ] || [ "$GITLAB_REPO_URL" = "null" ]; then
         echo -e "  ${RED}✗ Не удалось получить URL репозитория из GitLab API${NC}"
         continue
@@ -372,7 +348,6 @@ echo "$REPO_LIST" | while read -r REPO_FULL_NAME; do
     echo "  Отправка в GitLab..."
     cd "${REPOS_DIR}/${REPO_NAME}.git"
     
-    # URL-encoding токена для использования в URL
     ENCODED_TOKEN=$(urlencode "${GITLAB_TOKEN}")
     
     if [[ "$GITLAB_REPO_URL" =~ ^https?:// ]]; then

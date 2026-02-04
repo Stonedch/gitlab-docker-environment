@@ -24,7 +24,6 @@ if [ -z "$MODE" ] || { [ "$MODE" != "export" ] && [ "$MODE" != "import" ]; }; th
     exit 1
 fi
 
-# Определяем корень проекта (где лежит .env)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_ROOT" || exit 1
@@ -50,7 +49,6 @@ fi
 GITLAB_PORT="${HTTP_PORT:-80}"
 GITLAB_URL="${EXTERNAL_URL%/}"
 
-# Если EXTERNAL_URL без порта и порт нестандартный — добавим его
 if [[ ! "$EXTERNAL_URL" =~ :[0-9]+(/|$) ]] && [ "$GITLAB_PORT" != "80" ] && [ "$GITLAB_PORT" != "443" ]; then
     GITLAB_URL="${GITLAB_URL}:${GITLAB_PORT}"
 fi
@@ -95,7 +93,6 @@ if [ "$MODE" = "export" ]; then
         RESP=$(curl -s --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
             "${GITLAB_API_URL}/api/v4/projects?simple=true&membership=true&per_page=100&page=${PAGE}" 2>/dev/null)
 
-        # Пустой массив или ошибка
         if [ -z "$RESP" ] || [ "$RESP" = "[]" ]; then
             break
         fi
@@ -136,7 +133,6 @@ if [ "$MODE" = "export" ]; then
         else
             echo "$RESP" | grep -o '"path_with_namespace":"[^"]*' | cut -d'"' -f4 | while read -r PATH_NS; do
                 [ -z "$PATH_NS" ] && continue
-                # Без jq не достанем корректно http_url_to_repo, поэтому пропустим
                 echo -e "${YELLOW}Пропуск ${PATH_NS} (нет jq для получения URL)${NC}"
             done
         fi
@@ -219,7 +215,6 @@ if [ "$MODE" = "import" ]; then
             return
         fi
 
-        # Добавляем токен в URL
         AUTH_URL="$GITLAB_REPO_URL"
         if [[ "$AUTH_URL" =~ ^https?:// ]]; then
             AUTH_URL=$(echo "$AUTH_URL" | sed "s|://|://oauth2:${ENCODED_GITLAB_TOKEN}@|")

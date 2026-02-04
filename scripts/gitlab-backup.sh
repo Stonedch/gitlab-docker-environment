@@ -18,7 +18,6 @@ if [ -z "$MODE" ] || { [ "$MODE" != "backup" ] && [ "$MODE" != "restore" ]; }; t
     exit 1
 fi
 
-# Корень проекта (где лежит docker-compose.yml и .env)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_ROOT"
@@ -47,7 +46,6 @@ timestamp() {
 }
 
 find_latest_backup_tar() {
-    # Ищем последний .tar в gitlab/data/backups
     if [ -d "${HOST_BACKUPS_DIR}" ]; then
         ls -1t "${HOST_BACKUPS_DIR}"/*_gitlab_backup.tar 2>/dev/null | head -n1 || true
     fi
@@ -77,7 +75,6 @@ if [ "$MODE" = "backup" ]; then
     echo "  в:  ${TARGET_DIR}/${BASENAME}"
     cp "$LATEST_TAR" "${TARGET_DIR}/${BASENAME}"
 
-    # Копируем конфиги, если есть
     if [ -f "${HOST_CONFIG_DIR}/gitlab.rb" ]; then
         cp "${HOST_CONFIG_DIR}/gitlab.rb" "${TARGET_DIR}/gitlab.rb"
     fi
@@ -97,13 +94,10 @@ fi
 if [ "$MODE" = "restore" ]; then
     REQ_ID="$2"
 
-    # Определяем, какой .tar использовать
     SELECTED_TAR=""
     SELECTED_ID=""
 
     if [ -n "$REQ_ID" ]; then
-        # Ищем файл по заданному ID
-        # Сначала в backups, потом в gitlab/data/backups
         CANDIDATE="$(ls -1 "${BACKUPS_DIR}"/**/"${REQ_ID}"_gitlab_backup.tar 2>/dev/null | head -n1 || true)"
         if [ -z "$CANDIDATE" ] && [ -d "${HOST_BACKUPS_DIR}" ]; then
             CANDIDATE="$(ls -1 "${HOST_BACKUPS_DIR}/${REQ_ID}"_gitlab_backup.tar 2>/dev/null | head -n1 || true)"
@@ -116,10 +110,8 @@ if [ "$MODE" = "restore" ]; then
         SELECTED_TAR="$CANDIDATE"
         SELECTED_ID="$REQ_ID"
     else
-        # Берём последний из gitlab/data/backups или из backups
         LATEST_TAR="$(find_latest_backup_tar)"
         if [ -z "$LATEST_TAR" ]; then
-            # Пробуем искать в ./backups
             CANDIDATE="$(ls -1t "${BACKUPS_DIR}"/**/*_gitlab_backup.tar 2>/dev/null | head -n1 || true)"
             if [ -z "$CANDIDATE" ]; then
                 echo -e "${RED}Не найдено ни одного бэкапа ни в ${HOST_BACKUPS_DIR}, ни в ${BACKUPS_DIR}${NC}"
