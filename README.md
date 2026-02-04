@@ -12,6 +12,7 @@
 - [Настройка](#настройка)
 - [Импорт репозиториев из GitHub в GitLab](#импорт-репозиториев-из-github-в-gitlab)
 - [Экономия памяти (low-memory режим)](#экономия-памяти-low-memory-режим)
+- [Импорт/экспорт репозиториев GitLab](#импортэкспорт-репозиториев-gitlab)
 
 ## Требования
 
@@ -164,6 +165,28 @@ GITLAB_TOKEN=<YOUR_GITLAB_TOKEN> ./scripts/import-from-github.sh <GITHUB_USER> <
 | `GITLAB_PUMA_MIN_THREADS` | `1` | минимальные потоки Puma |
 | `GITLAB_PUMA_MAX_THREADS` | `2` | максимальные потоки Puma |
 | `GITLAB_SIDEKIQ_CONCURRENCY` | `5` | параллелизм Sidekiq |
+
+## Импорт/экспорт репозиториев GitLab
+
+Для работы со всеми репозиториями текущего GitLab используется скрипт `scripts/gitlab-import-export.sh`.
+
+Требуется `GITLAB_TOKEN` с правами: `api`, `read_repository`, `write_repository` (задаётся в `.env` или через окружение).
+
+Экспорт (создание/обновление зеркальных клонов):
+
+```bash
+./scripts/gitlab-import-export.sh export
+```
+
+Зеркала будут сохранены в `.gitlab/repositories/<path_with_namespace>.git`.
+
+Импорт (push зеркал обратно в текущий GitLab):
+
+```bash
+./scripts/gitlab-import-export.sh import
+```
+
+Это обновит существующие проекты или создаст новые (в namespace пользователя токена).
 
 ---
 
