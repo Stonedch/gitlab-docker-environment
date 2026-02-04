@@ -32,24 +32,29 @@ for cmd in curl git docker-compose; do
     fi
 done
 
-if [ $# -lt 2 ]; then
-    echo -e "${RED}Использование: $0 <GITHUB_USER> <GITHUB_TOKEN> [GITLAB_TOKEN]${NC}"
-    echo "Пример: $0 stonedch ghp_xxxxxxxxxxxx"
-    echo ""
-    echo "Или с токеном GitLab:"
-    echo "  GITLAB_TOKEN=your_token $0 stonedch ghp_xxxxxxxxxxxx"
-    echo "  $0 stonedch ghp_xxxxxxxxxxxx your_gitlab_token"
+if [ ! -f .env ]; then
+    echo -e "${RED}Ошибка: файл .env не найден${NC}"
     exit 1
 fi
 
-GITHUB_USER="$1"
-GITHUB_TOKEN="$2"
-GITLAB_TOKEN_PARAM="$3"
+source .env
+
+# Аргументы (если переданы) имеют приоритет над .env
+ARG_GITHUB_USER="$1"
+ARG_GITHUB_TOKEN="$2"
+ARG_GITLAB_TOKEN="$3"
+
+GITHUB_USER="${ARG_GITHUB_USER:-${GITHUB_USER}}"
+GITHUB_TOKEN="${ARG_GITHUB_TOKEN:-${GITHUB_TOKEN}}"
+
 REPOS_DIR=".github/repositories"
 
-# Проверяем, передан ли токен GitLab через параметр или переменную окружения
-if [ -n "$GITLAB_TOKEN_PARAM" ]; then
-    GITLAB_TOKEN="$GITLAB_TOKEN_PARAM"
+# GitLab token можно передать:
+# - 3-м аргументом
+# - через переменную окружения GITLAB_TOKEN
+# - через .env (GITLAB_TOKEN=...)
+if [ -n "$ARG_GITLAB_TOKEN" ]; then
+    GITLAB_TOKEN="$ARG_GITLAB_TOKEN"
     USE_EXISTING_TOKEN=true
 elif [ -n "$GITLAB_TOKEN" ]; then
     USE_EXISTING_TOKEN=true
@@ -57,12 +62,18 @@ else
     USE_EXISTING_TOKEN=false
 fi
 
-if [ ! -f .env ]; then
-    echo -e "${RED}Ошибка: файл .env не найден${NC}"
+if [ -z "$GITHUB_USER" ] || [ -z "$GITHUB_TOKEN" ]; then
+    echo -e "${RED}Ошибка: не заданы GITHUB_USER/GITHUB_TOKEN${NC}"
+    echo ""
+    echo "Укажите их одним из способов:"
+    echo "  1) Аргументами:"
+    echo "     $0 <GITHUB_USER> <GITHUB_TOKEN> [GITLAB_TOKEN]"
+    echo "  2) В .env:"
+    echo "     GITHUB_USER=... "
+    echo "     GITHUB_TOKEN=... "
+    echo "  3) Через переменные окружения"
     exit 1
 fi
-
-source .env
 
 if [ -z "$EXTERNAL_URL" ]; then
     echo -e "${RED}Ошибка: EXTERNAL_URL не задан в .env${NC}"

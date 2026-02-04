@@ -118,6 +118,18 @@ docker-compose up -d
 ./scripts/import-from-github.sh <GITHUB_USER> <GITHUB_TOKEN>
 ```
 
+Также можно положить данные в `.env` (удобно для повторных запусков):
+
+- `GITHUB_USER`
+- `GITHUB_TOKEN`
+- опционально `GITLAB_TOKEN`
+
+Тогда скрипт можно запускать без параметров:
+
+```bash
+./scripts/import-from-github.sh
+```
+
 Скрипт попытается **создать GitLab Personal Access Token** под `root`, используя пароль root из контейнера
 (см. раздел [«Администрирование»](#администрирование)).
 
