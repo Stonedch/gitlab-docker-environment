@@ -10,6 +10,7 @@
 - [Администрирование](#администрирование)
 - [Резервное копирование](#резервное-копирование)
 - [Настройка](#настройка)
+- [Импорт репозиториев из GitHub в GitLab](#импорт-репозиториев-из-github-в-gitlab)
 
 ## Требования
 
@@ -87,6 +88,45 @@ docker-compose exec -t gitlab gitlab-backup restore BACKUP=ИД_БЭКАПА
 ```bash
 docker-compose exec gitlab gitlab-ctl reconfigure
 ```
+
+## Импорт репозиториев из GitHub в GitLab
+
+Скрипт `scripts/import-from-github.sh`:
+
+- очищает/создаёт локальную директорию `.github/repositories` и импортирует туда репозитории с GitHub (mirror clone)
+- создаёт (или обновляет) проекты в вашем локальном GitLab и пушит туда содержимое (`git push --mirror`)
+
+Директория `.github/repositories` добавлена в `.gitignore` и не попадает в репозиторий.
+
+### Требования
+
+- `docker-compose`, `curl`, `git`
+- опционально `jq` (для более надёжного парсинга JSON)
+
+### Запуск
+
+1) Убедитесь, что GitLab запущен и инициализирован:
+
+```bash
+docker-compose up -d
+```
+
+2) Запустите импорт (нужны GitHub login и classic access token):
+
+```bash
+./scripts/import-from-github.sh <GITHUB_USER> <GITHUB_TOKEN>
+```
+
+Скрипт попытается **создать GitLab Personal Access Token** под `root`, используя пароль root из контейнера
+(см. раздел [«Администрирование»](#администрирование)).
+
+Если токен создать не удалось, создайте его вручную в GitLab и передайте скрипту:
+
+```bash
+GITLAB_TOKEN=<YOUR_GITLAB_TOKEN> ./scripts/import-from-github.sh <GITHUB_USER> <GITHUB_TOKEN>
+```
+
+Права токена GitLab: `api`, `write_repository`, `read_repository`.
 
 ---
 
