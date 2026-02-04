@@ -7,6 +7,26 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
+# --- Logging ---
+# Определяем путь к директории логов относительно корня проекта (где находится .env)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+LOG_DIR="${PROJECT_ROOT}/.logs/import"
+RUN_TS="$(date +%Y-%m-%d_%H-%M-%S)"
+LOG_FILE="${LOG_DIR}/import_${RUN_TS}.log"
+
+# Создаём директорию для логов перед перенаправлением вывода
+mkdir -p "${LOG_DIR}"
+
+# Redirect all output to log + console
+exec > >(tee -a "${LOG_FILE}") 2>&1
+
+echo "============================================================"
+echo "GitHub -> GitLab import started: ${RUN_TS}"
+echo "Log file: ${LOG_FILE}"
+echo "============================================================"
+echo ""
+
 # Функция для URL-encoding
 urlencode() {
     local string="${1}"
@@ -267,42 +287,86 @@ echo "$REPO_LIST" | while read -r REPO_FULL_NAME; do
         continue
     fi
     
-    REPO_EXISTS_RESPONSE=$(curl -s --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
+    # Проверяем, существует ли проект в GitLab (и параллельно получаем URL репозитория)
+    PROJECT_GET=$(curl -s -w "\n%{http_code}" --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
         "${GITLAB_API_URL}/api/v4/projects/root%2F${REPO_NAME}" 2>/dev/null)
-    
-    REPO_EXISTS=$(echo "$REPO_EXISTS_RESPONSE" | grep -o '"id"' | head -1)
-    
-    if [ -n "$REPO_EXISTS" ]; then
+    PROJECT_GET_CODE=$(echo "$PROJECT_GET" | tail -n1)
+    PROJECT_GET_BODY=$(echo "$PROJECT_GET" | sed '$d')
+
+    if [ "$PROJECT_GET_CODE" = "200" ]; then
         echo "  Репозиторий уже существует в GitLab, обновление..."
         if command -v jq > /dev/null 2>&1; then
-            GITLAB_REPO_URL=$(echo "$REPO_EXISTS_RESPONSE" | jq -r '.http_url_to_repo' 2>/dev/null || echo "")
+            GITLAB_REPO_URL=$(echo "$PROJECT_GET_BODY" | jq -r '.http_url_to_repo' 2>/dev/null || echo "")
         else
-            GITLAB_REPO_URL=$(echo "$REPO_EXISTS_RESPONSE" | grep -o '"http_url_to_repo":"[^"]*' | cut -d'"' -f4)
+            GITLAB_REPO_URL=$(echo "$PROJECT_GET_BODY" | grep -o '"http_url_to_repo":"[^"]*' | cut -d'"' -f4)
         fi
-    else
+    elif [ "$PROJECT_GET_CODE" = "404" ]; then
         echo "  Создание репозитория в GitLab..."
-        CREATE_RESPONSE=$(curl -s --request POST \
+        PROJECT_CREATE=$(curl -s -w "\n%{http_code}" --request POST \
             --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
             --header "Content-Type: application/json" \
             --data "{\"name\":\"${REPO_NAME}\",\"visibility\":\"private\"}" \
             "${GITLAB_API_URL}/api/v4/projects" 2>/dev/null)
-        
-        if command -v jq > /dev/null 2>&1; then
-            GITLAB_REPO_URL=$(echo "$CREATE_RESPONSE" | jq -r '.http_url_to_repo' 2>/dev/null || echo "")
-            ERROR_MSG=$(echo "$CREATE_RESPONSE" | jq -r '.message' 2>/dev/null || echo "")
-        else
-            GITLAB_REPO_URL=$(echo "$CREATE_RESPONSE" | grep -o '"http_url_to_repo":"[^"]*' | cut -d'"' -f4)
-            ERROR_MSG=$(echo "$CREATE_RESPONSE" | grep -o '"message":"[^"]*' | cut -d'"' -f4)
-        fi
-        
-        if [ -z "$GITLAB_REPO_URL" ]; then
-            echo -e "  ${RED}✗ Ошибка создания репозитория${NC}"
-            if [ -n "$ERROR_MSG" ]; then
-                echo "    $ERROR_MSG"
-            fi
+
+        PROJECT_CREATE_CODE=$(echo "$PROJECT_CREATE" | tail -n1)
+        PROJECT_CREATE_BODY=$(echo "$PROJECT_CREATE" | sed '$d')
+
+        if [ "$PROJECT_CREATE_CODE" != "201" ] && [ "$PROJECT_CREATE_CODE" != "200" ]; then
+            echo -e "  ${RED}✗ Ошибка создания репозитория (HTTP ${PROJECT_CREATE_CODE})${NC}"
+            echo "$PROJECT_CREATE_BODY" | head -3 | sed 's/^/    /'
+            # Частый кейс: проект уже существует, но GET по root/path не вернул 200 (например, из-за прав/namespace).
+            # Попробуем найти проект через search и использовать его URL.
+            if echo "$PROJECT_CREATE_BODY" | grep -q "has already been taken"; then
+                echo "  Похоже, проект уже существует. Пробую найти его через поиск..."
+                SEARCH=$(curl -s -w "\n%{http_code}" --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
+                    "${GITLAB_API_URL}/api/v4/projects?search=${REPO_NAME}&simple=true&per_page=100" 2>/dev/null)
+                SEARCH_CODE=$(echo "$SEARCH" | tail -n1)
+                SEARCH_BODY=$(echo "$SEARCH" | sed '$d')
+
+                if [ "$SEARCH_CODE" = "200" ]; then
+                    if command -v jq > /dev/null 2>&1; then
+                        # Берём первый проект с совпадающим path
+                        GITLAB_REPO_URL=$(echo "$SEARCH_BODY" | jq -r --arg p "$REPO_NAME" '.[] | select(.path==$p) | .http_url_to_repo' 2>/dev/null | head -n1)
+                    else
+                        # Fallback без jq: грубо берём первый http_url_to_repo из результатов
+                        GITLAB_REPO_URL=$(echo "$SEARCH_BODY" | grep -o '"http_url_to_repo":"[^"]*' | head -n1 | cut -d'"' -f4)
+                    fi
+
+                    if [ -n "$GITLAB_REPO_URL" ] && [ "$GITLAB_REPO_URL" != "null" ]; then
+                        echo -e "  ${GREEN}✓ Найден существующий проект${NC}"
+                        # Пропускаем continue — ниже будет push
+                    else
+                        echo -e "  ${RED}✗ Поиск не нашёл URL репозитория${NC}"
+                        continue
+                    fi
+                else
+                    echo -e "  ${RED}✗ Ошибка поиска проекта (HTTP ${SEARCH_CODE})${NC}"
+                    echo "$SEARCH_BODY" | head -3 | sed 's/^/    /'
+                    continue
+                fi
+            else
             continue
+            fi
         fi
-        echo -e "  ${GREEN}✓ Репозиторий создан${NC}"
+
+        if [ -z "$GITLAB_REPO_URL" ] || [ "$GITLAB_REPO_URL" = "null" ]; then
+            if command -v jq > /dev/null 2>&1; then
+                GITLAB_REPO_URL=$(echo "$PROJECT_CREATE_BODY" | jq -r '.http_url_to_repo' 2>/dev/null || echo "")
+            else
+                GITLAB_REPO_URL=$(echo "$PROJECT_CREATE_BODY" | grep -o '"http_url_to_repo":"[^"]*' | cut -d'"' -f4)
+            fi
+            echo -e "  ${GREEN}✓ Репозиторий создан${NC}"
+        fi
+    else
+        echo -e "  ${RED}✗ Ошибка запроса к GitLab (HTTP ${PROJECT_GET_CODE})${NC}"
+        echo "$PROJECT_GET_BODY" | head -3 | sed 's/^/    /'
+        continue
+    fi
+
+    # Санити-чек URL репозитория (jq может вернуть 'null')
+    if [ -z "$GITLAB_REPO_URL" ] || [ "$GITLAB_REPO_URL" = "null" ]; then
+        echo -e "  ${RED}✗ Не удалось получить URL репозитория из GitLab API${NC}"
+        continue
     fi
     
     echo "  Отправка в GitLab..."
@@ -341,3 +405,9 @@ echo -e "${GREEN}Импорт завершен!${NC}"
 echo ""
 echo "Репозитории сохранены в: $REPOS_DIR"
 echo "Репозитории доступны в GitLab: ${GITLAB_URL}"
+
+echo ""
+echo "============================================================"
+echo "Import finished: $(date +%Y-%m-%d_%H-%M-%S)"
+echo "Log file: ${LOG_FILE}"
+echo "============================================================"

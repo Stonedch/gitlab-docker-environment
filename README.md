@@ -96,6 +96,7 @@ docker-compose exec gitlab gitlab-ctl reconfigure
 
 - очищает/создаёт локальную директорию `.github/repositories` и импортирует туда репозитории с GitHub (mirror clone)
 - создаёт (или обновляет) проекты в вашем локальном GitLab и пушит туда содержимое (`git push --mirror`)
+- пишет лог запуска в `./logs/import/` (файл с текущими датой/временем импорта)
 
 Директория `.github/repositories` добавлена в `.gitignore` и не попадает в репозиторий.
 
