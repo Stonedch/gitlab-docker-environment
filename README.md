@@ -59,7 +59,7 @@ docker-compose exec gitlab cat /etc/gitlab/gitlab.rb
 
 ## Резервное копирование
 
-Создать бэкап:
+Создать бэкап вручную:
 ```bash
 docker-compose exec -t gitlab gitlab-backup create
 ```
@@ -71,6 +71,24 @@ docker-compose exec -t gitlab chown git:git /var/opt/gitlab/backups/ИМЯ_ФА�
 docker-compose exec -t gitlab gitlab-backup restore BACKUP=ИД_БЭКАПА
 ```
 Файлы `gitlab.rb` и `gitlab-secrets.json` в бэкап не входят — сохраняйте их отдельно.
+
+Для удобства есть скрипт полного бэкапа `scripts/gitlab-backup.sh`:
+
+- `backup` — запускает `gitlab-backup create`, копирует `.tar` и конфиги в `./backups/<дата>_<ID>/`
+- `restore` — копирует нужный `.tar` в `gitlab/data/backups` и вызывает `gitlab-backup restore`
+
+Примеры:
+
+```bash
+# Создать бэкап
+./scripts/gitlab-backup.sh backup
+
+# Восстановить последний бэкап
+./scripts/gitlab-backup.sh restore
+
+# Восстановить конкретный бэкап по ID
+./scripts/gitlab-backup.sh restore 1762504061_2025_11_07_18.3.5-ee
+```
 
 ## Настройка
 
