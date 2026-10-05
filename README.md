@@ -49,9 +49,3 @@ docker-compose up -d --build
 | `GITLAB_PUMA_MIN_THREADS`  | `1`                        | min threads Puma                     |
 | `GITLAB_PUMA_MAX_THREADS`  | `2`                        | max threads Puma                     |
 | `GITLAB_SIDEKIQ_CONCURRENCY` | `5`                      | параллелизм Sidekiq                  |
-
-## Лицензия и автор
-
-**Лицензия:** [MIT](LICENSE)  
-**Автор:** [@stonedch](https://github.com/stonedch/)
-
