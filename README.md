@@ -17,6 +17,14 @@ mkdir -p gitlab/config gitlab/data gitlab/logs
 docker-compose up -d --build
 ```
 
+После завершения первой инициализации GitLab получите начальный пароль пользователя `root`:
+
+```bash
+cat config/initial_root_password
+```
+
+Команда приведена для `GITLAB_HOME=.`. Если указан другой путь, файл находится в `$GITLAB_HOME/config/initial_root_password`.
+
 ## Настройки окружения (.env)
 
 | Переменная                  | Значение по умолчанию      | Назначение                           |
