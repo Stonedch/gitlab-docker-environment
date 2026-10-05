@@ -1,8 +1,4 @@
 /config
 /data
 /logs
-/.logs
 /.env
-/.github/repositories
-/.gitlab/repositories
-/backups

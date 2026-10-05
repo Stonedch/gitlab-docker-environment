@@ -17,18 +17,6 @@ mkdir -p gitlab/config gitlab/data gitlab/logs
 docker-compose up -d --build
 ```
 
-## Скрипты
-
-```bash
-./scripts/gitlab-backup.sh backup
-./scripts/gitlab-backup.sh restore [BACKUP_ID]
-
-./scripts/import-from-github.sh [GITHUB_USER] [GITHUB_TOKEN] [GITLAB_TOKEN]
-
-./scripts/gitlab-import-export.sh export
-./scripts/gitlab-import-export.sh import
-```
-
 ## Настройки окружения (.env)
 
 | Переменная                  | Значение по умолчанию      | Назначение                           |
@@ -38,9 +26,6 @@ docker-compose up -d --build
 | `HTTPS_PORT`               | `443`                      | HTTPS-порт на хосте                  |
 | `SSH_PORT`                 | `22`                       | SSH-порт для Git                     |
 | `GITLAB_HOME`              | `.`                        | корень томов `config/data/logs`      |
-| `GITHUB_USER`              | пусто                      | логин GitHub для импорта             |
-| `GITHUB_TOKEN`             | пусто                      | токен GitHub (classic PAT)           |
-| `GITLAB_TOKEN`             | пусто                      | PAT GitLab (api, read/write repo)    |
 | `GITLAB_MEM_LIMIT`         | `2048m`                    | лимит RAM контейнера                 |
 | `GITLAB_CPUS`              | `2`                        | лимит CPU контейнера                 |
 | `GITLAB_SHM_SIZE`          | `64m`                      | shared memory контейнера             |
