@@ -37,6 +37,6 @@ services:
       - '$GITLAB_HOME/logs:/var/log/gitlab'
       - '$GITLAB_HOME/data:/var/opt/gitlab'
     shm_size: '${GITLAB_SHM_SIZE:-64m}'
-    # Container limits (docker-compose, non-swarm)
+    # Container limits (docker compose, non-swarm)
     mem_limit: '${GITLAB_MEM_LIMIT:-2048m}'
     cpus: '${GITLAB_CPUS:-2}'

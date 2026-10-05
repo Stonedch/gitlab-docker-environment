@@ -13,8 +13,8 @@
 git clone https://github.com/your-username/gitlab-docker-compose.git
 cd gitlab-docker-compose
 cp .env.example .env
-mkdir -p gitlab/config gitlab/data gitlab/logs
-docker-compose up -d --build
+mkdir -p config data logs
+docker compose up -d --build
 ```
 
 После завершения первой инициализации GitLab получите начальный пароль пользователя `root`:
@@ -24,6 +24,21 @@ cat config/initial_root_password
 ```
 
 Команда приведена для `GITLAB_HOME=.`. Если указан другой путь, файл находится в `$GITLAB_HOME/config/initial_root_password`.
+
+## Резервное копирование
+
+Из корня проекта, при запущенном и инициализированном GitLab:
+
+```bash
+./scripts/gitlab-backup.sh backup
+./scripts/gitlab-backup.sh restore BACKUP_ID
+```
+
+- `backups/BACKUP_ID/` — данные GitLab, `gitlab.rb`, `gitlab-secrets.json`, `.env`, `docker-compose.yml`. ID выводится после создания.
+- `restore` перезаписывает данные после подтверждения `yes`. Нужны та же версия и редакция GitLab (CE/EE).
+- Конфиги восстанавливаются вручную: `.env` и `docker-compose.yml` — в корень проекта, `gitlab.rb` и `gitlab-secrets.json` — в `$GITLAB_HOME/config` до запуска GitLab.
+- Внешнее object storage и Container Registry копируются отдельно.
+
 
 ## Настройки окружения (.env)
 
